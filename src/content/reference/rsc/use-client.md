@@ -376,4 +376,96 @@ These libraries may rely on component Hooks or client APIs. Third-party componen
 
 If these libraries have been updated to be compatible with React Server Components, then they will already include `'use client'` markers of their own, allowing you to use them directly from your Server Components. If a library hasn't been updated, or if a component needs props like event handlers that can only be specified on the client, you may need to add your own Client Component file in between the third-party Client Component and your Server Component where you'd like to use it.
 
-[TODO]: <> (Troubleshooting - need use-cases)
+## Troubleshooting {/*troubleshooting*/}
+
+### "Functions cannot be passed directly to Client Components" error {/*functions-cannot-be-passed-directly*/}
+
+This error occurs when you try to pass a function from a Server Component to a Client Component.
+
+```js
+// Server Component
+import ClientButton from './ClientButton';
+
+export default function Page() {
+  function handleClick() {
+    console.log('clicked');
+  }
+  // This will error!
+  return <ClientButton onClick={handleClick} />;
+}
+```
+
+Functions are not serializable, so they cannot be passed from server to client. To fix this, either move the function to the Client Component, or use a [Server Function](/reference/rsc/server-functions) with `'use server'`.
+
+```js
+// Solution 1: Move the handler to the Client Component
+'use client';
+
+export default function ClientButton() {
+  function handleClick() {
+    console.log('clicked');
+  }
+  return <button onClick={handleClick}>Click me</button>;
+}
+```
+
+```js
+// Solution 2: Use a Server Function
+'use server';
+
+export async function handleClick() {
+  console.log('clicked on server');
+}
+```
+
+### Component uses hooks but doesn't have `'use client'` {/*component-uses-hooks-without-use-client*/}
+
+If you're using hooks like `useState`, `useEffect`, or `useContext` in a component, you need to mark it as a Client Component.
+
+```js
+// This will error - hooks require 'use client'
+import { useState } from 'react';
+
+export default function Counter() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+```
+
+Add `'use client'` at the top of the file:
+
+```js
+'use client';
+
+import { useState } from 'react';
+
+export default function Counter() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+```
+
+### Third-party library doesn't work in Server Components {/*third-party-library-server-component*/}
+
+Many third-party libraries were written before Server Components existed and may use client-only features. If you get an error when importing a library in a Server Component, create a wrapper Client Component:
+
+```js
+// components/ChartWrapper.js
+'use client';
+
+import { Chart } from 'third-party-chart-library';
+
+export default function ChartWrapper(props) {
+  return <Chart {...props} />;
+}
+```
+
+Then import the wrapper in your Server Component:
+
+```js
+// page.js (Server Component)
+import ChartWrapper from './components/ChartWrapper';
+
+export default function Page() {
+  return <ChartWrapper data={data} />;
+}
