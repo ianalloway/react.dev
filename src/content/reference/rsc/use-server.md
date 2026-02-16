@@ -215,3 +215,97 @@ export default async function incrementLike() {
 ```
 
 To read a Server Function return value, you'll need to `await` the promise returned.
+
+## Troubleshooting {/*troubleshooting*/}
+
+### "Server Functions cannot be called during render" error {/*server-functions-cannot-be-called-during-render*/}
+
+Server Functions should only be called in response to user actions (like form submissions or button clicks), not during component rendering.
+
+```js
+// This will error - calling during render
+function BadComponent() {
+  const data = await serverFunction(); // Don't do this!
+  return <div>{data}</div>;
+}
+
+// Correct - call in response to user action
+function GoodComponent() {
+  const [data, setData] = useState(null);
+  
+  const handleClick = async () => {
+    const result = await serverFunction();
+    setData(result);
+  };
+  
+  return <button onClick={handleClick}>Load Data</button>;
+}
+```
+
+For data fetching during render, use a Server Component instead of a Server Function.
+
+### "Arguments must be serializable" error {/*arguments-must-be-serializable*/}
+
+Server Functions can only receive serializable arguments. You cannot pass functions, class instances, or React elements.
+
+```js
+// This will error - functions aren't serializable
+async function saveData(callback) {
+  'use server';
+  // ...
+}
+
+// Correct - pass serializable data
+async function saveData(userId, formData) {
+  'use server';
+  // ...
+}
+```
+
+### Server Function not updating the UI {/*server-function-not-updating-ui*/}
+
+If your Server Function runs but the UI doesn't update, make sure you're calling it inside a Transition when outside a form:
+
+```js
+import { useTransition } from 'react';
+
+function MyComponent() {
+  const [isPending, startTransition] = useTransition();
+  
+  const handleClick = () => {
+    // Wrap in startTransition for proper UI updates
+    startTransition(async () => {
+      await myServerFunction();
+    });
+  };
+  
+  return <button onClick={handleClick} disabled={isPending}>Submit</button>;
+}
+```
+
+### "use server" directive not working {/*use-server-directive-not-working*/}
+
+The `'use server'` directive must be:
+1. At the very beginning of the function body (not before the function)
+2. Written with single or double quotes (not backticks)
+3. Used only in async functions
+
+```js
+// Wrong - directive before function
+'use server';
+async function myFunction() {
+  // ...
+}
+
+// Correct - directive inside function body
+async function myFunction() {
+  'use server';
+  // ...
+}
+
+// Also correct - at top of file to mark all exports
+'use server';
+
+export async function functionA() { /* ... */ }
+export async function functionB() { /* ... */ }
+```
